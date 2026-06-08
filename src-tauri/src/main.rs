@@ -43,8 +43,8 @@ struct AppState {
 }
 
 #[tauri::command]
-fn ping() -> String {
-    log("ping -> pong");
+fn ping(win: tauri::Window) -> String {
+    log(&format!("ping 被调用, 来自窗口: {}", win.label()));
     "pong".to_string()
 }
 
@@ -62,25 +62,6 @@ fn get_data(state: State<AppState>) -> Result<String, String> {
     serde_json::to_string(&report).map_err(|e| { log(&format!("序列化失败: {}", e)); e.to_string() })
 }
 
-fn open_or_focus_window(app: &tauri::AppHandle, label: &str, url: &str, title: &str, w: f64, h: f64) -> Result<(), String> {
-    log(&format!("尝试打开窗口: {} ({})", label, title));
-    if let Some(win) = app.get_webview_window(label) {
-        log(&format!("窗口 {} 已存在，聚焦", label));
-        let _ = win.set_focus();
-        return Ok(());
-    }
-    log(&format!("创建新窗口: {}", label));
-    tauri::WebviewWindowBuilder::new(app, label, tauri::WebviewUrl::App(url.into()))
-        .title(title)
-        .inner_size(w, h)
-        .center()
-        .closable(true)
-        .build()
-        .map_err(|e| { log(&format!("创建窗口失败: {}", e)); e.to_string() })?;
-    log(&format!("窗口 {} 创建成功", label));
-    Ok(())
-}
-
 #[tauri::command]
 fn quit_app(app: tauri::AppHandle) -> Result<(), String> {
     log("quit_app 被调用，退出程序");
@@ -88,17 +69,6 @@ fn quit_app(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-fn open_model_window(app: tauri::AppHandle) -> Result<(), String> {
-    log("open_model_window 被调用");
-    open_or_focus_window(&app, "models", "models.html", "按模型统计", 760.0, 300.0)
-}
-
-#[tauri::command]
-fn open_daily_window(app: tauri::AppHandle) -> Result<(), String> {
-    log("open_daily_window 被调用");
-    open_or_focus_window(&app, "daily", "daily.html", "按日统计", 640.0, 340.0)
-}
 
 fn main() {
     init_panic_hook();
@@ -140,8 +110,12 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .on_window_event(|w, e| {
             if let tauri::WindowEvent::CloseRequested { .. } = e {
-                log("窗口关闭请求，退出程序");
-                w.app_handle().exit(0);
+                if w.label() == "main" {
+                    log("主窗口关闭，退出程序");
+                    w.app_handle().exit(0);
+                } else {
+                    log(&format!("子窗口 {} 关闭，不退出", w.label()));
+                }
             }
         })
         .manage(AppState {
@@ -150,7 +124,7 @@ fn main() {
             config: cfg,
         })
         .invoke_handler(tauri::generate_handler![
-            ping, get_data, open_model_window, open_daily_window, quit_app
+            ping, get_data, quit_app
         ])
         .run(tauri::generate_context!())
         .expect("启动失败");
