@@ -6,6 +6,8 @@ src-tauri/target/
 src-tauri/gen/
 
 # 系统 / 编辑器
+.vscode/
+.gitattributes
 .venv/
 __pycache__/
 *.pyc
