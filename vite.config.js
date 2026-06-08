@@ -20,11 +20,7 @@ export default defineConfig({
     outDir: "../dist",
     emptyOutDir: true,
     rollupOptions: {
-      input: {
-        main: resolve(__dirname, "frontend/index.html"),
-        models: resolve(__dirname, "frontend/models.html"),
-        daily: resolve(__dirname, "frontend/daily.html"),
-      },
+      input: resolve(__dirname, "frontend/index.html"),
     },
   },
 });

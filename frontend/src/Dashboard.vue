@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from "vue";
-import { getData, fmt, balance } from "./api.js";
+import { getData, fmt, balance, exitApp } from "./api.js";
 
 const d = ref(null);
 const err = ref("");
@@ -25,28 +25,24 @@ onMounted(() => { load(); setInterval(load, 120000); });
     <div v-if="d">
       <!-- 主界面 -->
       <template v-if="!showPanel">
-        <div class="flex justify-between items-center">
+        <div class="flex justify-between">
           <span class="font-bold text-sm">[余额] {{ balance(d.balance) }}</span>
           <span class="text-gray-400 text-[10px]">{{ d.update_time }} 每120s</span>
         </div>
-        <table class="w-full">
-          <thead><tr class="text-left">
-            <th class="w-12"></th><th class="font-bold">月度</th>
-            <th class="font-bold text-right">{{ d.today_label.slice(5) }}</th>
-          </tr></thead>
-          <tbody>
-            <tr><td>消费</td><td>{{ balance(d.month_cost) }}</td><td class="text-right">{{ balance(d.today_cost) }}</td></tr>
-            <tr><td>Token</td><td>{{ d.month_tokens }}</td><td class="text-right">{{ fmt(d.today_tokens) }}</td></tr>
-            <tr><td>请求</td><td>{{ fmt(d.month_req) }}</td><td class="text-right">{{ fmt(d.today_req) }}</td></tr>
-            <tr><td>命中</td><td>{{ d.month_hit }}</td><td class="text-right">{{ d.today_hit }}</td></tr>
-            <tr><td>输出</td><td>{{ fmt(d.month_out_tokens) }}</td><td class="text-right">{{ fmt(d.today_out_tokens) }}</td></tr>
-          </tbody>
-        </table>
-        <div class="flex gap-1 pt-0.5">
+        <div class="flex gap-4 mt-0.5">
+          <span class="font-bold w-12"></span>
+          <span class="font-bold w-20">月度</span>
+          <span class="font-bold w-20">{{ d.today_label.slice(5) }}</span>
+        </div>
+        <div class="flex gap-4" v-for="row in [['消费', balance(d.month_cost), balance(d.today_cost)],['Token', d.month_tokens, fmt(d.today_tokens)],['请求', fmt(d.month_req), fmt(d.today_req)],['命中', d.month_hit, d.today_hit],['输出', fmt(d.month_out_tokens), fmt(d.today_out_tokens)]]" :key="row[0]">
+          <span class="w-12">{{ row[0] }}</span>
+          <span class="w-20">{{ row[1] }}</span>
+          <span class="w-20">{{ row[2] }}</span>
+        </div>
+        <div class="flex gap-1 mt-1">
           <button @click="togglePanel('models')" class="px-2 py-0.5 border border-gray-300 rounded text-xs cursor-pointer hover:bg-gray-100">按模型统计</button>
           <button @click="togglePanel('daily')" class="px-2 py-0.5 border border-gray-300 rounded text-xs cursor-pointer hover:bg-gray-100">按日统计</button>
           <button @click="refresh" class="px-2 py-0.5 border border-gray-300 rounded text-xs cursor-pointer hover:bg-gray-100">刷新</button>
-          <button @click="exitApp" class="px-2 py-0.5 border border-gray-300 rounded text-xs cursor-pointer hover:bg-gray-100">退出</button>
         </div>
       </template>
 
