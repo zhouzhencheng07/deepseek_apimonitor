@@ -1,0 +1,24 @@
+# 构建产物
+node_modules/
+dist/
+target/
+src-tauri/target/
+src-tauri/gen/
+
+# 系统 / 编辑器
+.venv/
+__pycache__/
+*.pyc
+.browser_data/
+.idea/
+*.swp
+*.swo
+
+# npm lock（应用锁文件，不适合提交）
+package-lock.json
+
+# Rust lock（同上）
+Cargo.lock
+
+# Claude 本地设置
+.claude/

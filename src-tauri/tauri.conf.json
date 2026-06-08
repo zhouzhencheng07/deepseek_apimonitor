@@ -1,0 +1,29 @@
+{
+  "productName": "DeepSeek Monitor",
+  "identifier": "com.deepseek.monitor",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "DeepSeek API使用数据",
+        "width": 340,
+        "height": 200,
+        "center": true,
+        "resizable": true,
+        "alwaysOnTop": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": []
+  }
+}
