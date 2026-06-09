@@ -5,21 +5,20 @@ use serde_json::Value;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelDetail {
     pub name: String,
-    pub requests: u64,
     pub total_tokens: u64,
     pub cache_hit: u64,
     pub cache_miss: u64,
     pub output_tokens: u64,
     pub cost: f64,
-    pub today_req: u64,
     pub today_tokens: u64,
+    pub today_hit: u64,
+    pub today_output_tokens: u64,
     pub today_cost: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DailyDetail {
     pub date: String,
-    pub requests: u64,
     pub total_tokens: u64,
     pub cache_hit: u64,
     pub output_tokens: u64,
@@ -32,13 +31,11 @@ pub struct ReportData {
     pub balance: f64,
     pub month_cost: f64,
     pub month_tokens: String,
-    pub month_req: u64,
     pub month_hit: String,
     pub month_out_tokens: u64,
     pub today_label: String,
     pub today_cost: f64,
     pub today_tokens: u64,
-    pub today_req: u64,
     pub today_hit: String,
     pub today_out_tokens: u64,
     pub models: Vec<ModelDetail>,
@@ -81,14 +78,13 @@ pub fn make_report_data(raw: &Value) -> Option<ReportData> {
     let amt_biz = raw["amount"]["data"]["biz_data"].as_object()?;
     let total_list = amt_biz["total"].as_array()?;
 
-    let mut all_req = 0u64; let mut all_hit = 0u64; let mut all_miss = 0u64; let mut all_resp = 0u64;
+    let mut all_hit = 0u64; let mut all_miss = 0u64; let mut all_resp = 0u64;
     for m in total_list {
         if let Some(usage) = m["usage"].as_array() {
             for u in usage {
                 let typ = u["type"].as_str().unwrap_or("");
                 let amt = u["amount"].as_str().unwrap_or("0").parse::<u64>().unwrap_or(0);
                 match typ {
-                    "REQUEST" => all_req += amt,
                     "PROMPT_CACHE_HIT_TOKEN" => all_hit += amt,
                     "PROMPT_CACHE_MISS_TOKEN" => all_miss += amt,
                     "RESPONSE_TOKEN" => all_resp += amt,
@@ -109,12 +105,15 @@ pub fn make_report_data(raw: &Value) -> Option<ReportData> {
     let mut today_label = Local::now().format("%Y-%m-%d").to_string();
     for d in amount_days.iter().rev() {
         if let Some(data) = d["data"].as_array() {
-            let has_req = data.iter().any(|m| {
+            let has_activity = data.iter().any(|m| {
                 m["usage"].as_array().map_or(false, |usage| {
-                    usage.iter().any(|u| u["type"] == "REQUEST" && u["amount"].as_str().unwrap_or("0").parse::<u64>().unwrap_or(0) > 0)
+                    usage.iter().any(|u| {
+                        matches!(u["type"].as_str(), Some("PROMPT_CACHE_HIT_TOKEN" | "PROMPT_CACHE_MISS_TOKEN" | "RESPONSE_TOKEN"))
+                            && u["amount"].as_str().unwrap_or("0").parse::<u64>().unwrap_or(0) > 0
+                    })
                 })
             });
-            if has_req {
+            if has_activity {
                 today_label = d["date"].as_str().unwrap_or("").to_string();
                 for m in data {
                     if let Some(usage) = m["usage"].as_array() {
@@ -134,7 +133,6 @@ pub fn make_report_data(raw: &Value) -> Option<ReportData> {
     let t_miss = t_tokens.get("PROMPT_CACHE_MISS_TOKEN").copied().unwrap_or(0);
     let t_resp = t_tokens.get("RESPONSE_TOKEN").copied().unwrap_or(0);
     let t_total = t_hit + t_miss + t_resp;
-    let t_req = t_tokens.get("REQUEST").copied().unwrap_or(0);
     let t_prompt = t_hit + t_miss;
     let today_hit = if t_prompt > 0 {
         format!("{:.1}%", t_hit as f64 / t_prompt as f64 * 100.0)
@@ -162,12 +160,13 @@ pub fn make_report_data(raw: &Value) -> Option<ReportData> {
     }
 
     // 各模型当日
-    let mut today_model: std::collections::HashMap<String, (u64, u64, f64)> = std::collections::HashMap::new();
+    let mut today_model: std::collections::HashMap<String, (u64, u64, u64, f64)> = std::collections::HashMap::new();
     for d in cost_days {
         if d["date"].as_str() != Some(&today_label) { continue; }
         if let Some(data) = d["data"].as_array() {
             for m in data {
                 let name = m["model"].as_str().unwrap_or("").to_string();
+                if name.to_lowercase().contains("chat") || name.to_lowercase().contains("reasoner") { continue; }
                 let mut cost = 0.0;
                 if let Some(usage) = m["usage"].as_array() {
                     for u in usage {
@@ -176,7 +175,7 @@ pub fn make_report_data(raw: &Value) -> Option<ReportData> {
                         }
                     }
                 }
-                today_model.insert(name, (0, 0, cost));
+                today_model.insert(name, (0, 0, 0, cost));
             }
         }
         break;
@@ -186,20 +185,22 @@ pub fn make_report_data(raw: &Value) -> Option<ReportData> {
         if let Some(data) = d["data"].as_array() {
             for m in data {
                 let name = m["model"].as_str().unwrap_or("").to_string();
-                let mut req = 0u64; let mut toks = 0u64;
+                if name.to_lowercase().contains("chat") || name.to_lowercase().contains("reasoner") { continue; }
+                let mut toks = 0u64; let mut hit = 0u64; let mut resp = 0u64;
                 if let Some(usage) = m["usage"].as_array() {
                     for u in usage {
                         let typ = u["type"].as_str().unwrap_or("");
                         let amt = u["amount"].as_str().unwrap_or("0").parse::<u64>().unwrap_or(0);
                         match typ {
-                            "REQUEST" => req += amt,
-                            "PROMPT_CACHE_HIT_TOKEN" | "PROMPT_CACHE_MISS_TOKEN" | "RESPONSE_TOKEN" => toks += amt,
+                            "PROMPT_CACHE_HIT_TOKEN" => { hit += amt; toks += amt; }
+                            "PROMPT_CACHE_MISS_TOKEN" => toks += amt,
+                            "RESPONSE_TOKEN" => { resp += amt; toks += amt; }
                             _ => {}
                         }
                     }
                 }
-                let e = today_model.entry(name).or_insert((0, 0, 0.0));
-                e.0 = req; e.1 = toks;
+                let e = today_model.entry(name).or_insert((0, 0, 0, 0.0));
+                e.0 = toks; e.1 = hit; e.2 = resp;
             }
         }
         break;
@@ -211,6 +212,7 @@ pub fn make_report_data(raw: &Value) -> Option<ReportData> {
     let mut cost_map = std::collections::HashMap::new();
     for m in cost_total {
         let name = m["model"].as_str().unwrap_or("").to_string();
+        if name.to_lowercase().contains("chat") || name.to_lowercase().contains("reasoner") { continue; }
         let mut cost = 0.0;
         if let Some(usage) = m["usage"].as_array() {
             for u in usage {
@@ -225,13 +227,13 @@ pub fn make_report_data(raw: &Value) -> Option<ReportData> {
     let mut models = Vec::new();
     for m in total_list {
         let name = m["model"].as_str().unwrap_or("").to_string();
-        let mut reqs = 0u64; let mut hit = 0u64; let mut miss = 0u64; let mut resp = 0u64;
+        if name.to_lowercase().contains("chat") || name.to_lowercase().contains("reasoner") { continue; }
+        let mut hit = 0u64; let mut miss = 0u64; let mut resp = 0u64;
         if let Some(usage) = m["usage"].as_array() {
             for u in usage {
                 let typ = u["type"].as_str().unwrap_or("");
                 let amt = u["amount"].as_str().unwrap_or("0").parse::<u64>().unwrap_or(0);
                 match typ {
-                    "REQUEST" => reqs += amt,
                     "PROMPT_CACHE_HIT_TOKEN" => hit += amt,
                     "PROMPT_CACHE_MISS_TOKEN" => miss += amt,
                     "RESPONSE_TOKEN" => resp += amt,
@@ -241,11 +243,11 @@ pub fn make_report_data(raw: &Value) -> Option<ReportData> {
         }
         let tt = hit + miss + resp;
         let cost = *cost_map.get(&name).unwrap_or(&0.0);
-        let td = today_model.get(&name).unwrap_or(&(0, 0, 0.0));
+        let td = today_model.get(&name).unwrap_or(&(0, 0, 0, 0.0));
         models.push(ModelDetail {
-            name, requests: reqs, total_tokens: tt, cache_hit: hit,
+            name, total_tokens: tt, cache_hit: hit,
             cache_miss: miss, output_tokens: resp, cost,
-            today_req: td.0, today_tokens: td.1, today_cost: td.2,
+            today_tokens: td.0, today_hit: td.1, today_output_tokens: td.2, today_cost: td.3,
         });
     }
 
@@ -291,17 +293,16 @@ pub fn make_report_data(raw: &Value) -> Option<ReportData> {
         let hr = if tp > 0 { format!("{:.1}%", hit as f64 / tp as f64 * 100.0) } else { "N/A".to_string() };
         let day_cost = *cost_day_map.get(&date).unwrap_or(&0.0);
         daily.push(DailyDetail {
-            date, requests: u.get("REQUEST").copied().unwrap_or(0),
-            total_tokens: tt, cache_hit: hit, output_tokens: resp, hit_rate: hr,
+            date, total_tokens: tt, cache_hit: hit, output_tokens: resp, hit_rate: hr,
             cost: day_cost,
         });
     }
 
     Some(ReportData {
         balance, month_cost, month_tokens: month_tokens_str,
-        month_req: all_req, month_hit, month_out_tokens: all_resp,
+        month_hit, month_out_tokens: all_resp,
         today_label, today_cost: t_cost, today_tokens: t_total,
-        today_req: t_req, today_hit, today_out_tokens: t_resp,
+        today_hit, today_out_tokens: t_resp,
         models, daily,
         update_time: Local::now().format("%m-%d %H:%M").to_string(),
     })

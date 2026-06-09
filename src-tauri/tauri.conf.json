@@ -1,6 +1,6 @@
 {
   "productName": "DeepSeek Monitor",
-  "identifier": "com.deepseek.monitor",
+  "identifier": "com.zhouzhencheng07.monitor",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -11,8 +11,8 @@
     "windows": [
       {
         "title": "DeepSeek API使用数据",
-        "width": 340,
-        "height": 200,
+        "width": 624,
+        "height": 201,
         "center": true,
         "resizable": true,
         "alwaysOnTop": true
@@ -24,6 +24,7 @@
   },
   "bundle": {
     "active": false,
+    "publisher": "zhouzhencheng07",
     "icon": []
   }
 }
