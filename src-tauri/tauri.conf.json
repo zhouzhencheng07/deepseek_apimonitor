@@ -11,8 +11,8 @@
     "windows": [
       {
         "title": "DeepSeek API使用数据",
-        "width": 624,
-        "height": 201,
+        "width": 570,
+        "height": 190,
         "center": true,
         "resizable": true,
         "alwaysOnTop": true
@@ -23,8 +23,8 @@
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
     "publisher": "zhouzhencheng07",
-    "icon": []
+    "icon": ["icons/icon.ico"]
   }
 }

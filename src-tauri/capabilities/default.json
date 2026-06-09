@@ -4,6 +4,16 @@
   "windows": ["*"],
   "permissions": [
     "core:default",
+    "core:window:allow-set-focus",
+    "core:window:allow-start-dragging",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-close",
+    "core:window:allow-set-position",
+    "core:window:allow-outer-position",
+    "core:webview:allow-create-webview-window",
+    "core:event:allow-emit",
+    "core:event:allow-listen",
     "shell:allow-open"
   ]
 }

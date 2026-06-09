@@ -1,6 +1,11 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { getData, fmt, balance } from "./api.js";
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { listen } from '@tauri-apps/api/event';
+
+const appWindow = getCurrentWindow();
 
 function hitRate(hit, total, output) {
   const d = total - output;
@@ -19,7 +24,23 @@ async function load() {
 }
 function refresh() { load(); }
 
-onMounted(() => { load(); setInterval(load, 120000); });
+async function openBall() {
+  const existing = await WebviewWindow.getByLabel('ball');
+  if (existing) { appWindow.hide(); return; }
+  new WebviewWindow('ball', {
+    url: '/?ball',
+    width: 105, height: 55,
+    decorations: false,
+    alwaysOnTop: true, skipTaskbar: true,
+  });
+  appWindow.hide();
+}
+
+onMounted(() => {
+  listen('focus-main', () => { appWindow.show(); appWindow.setFocus(); });
+  load();
+  setInterval(load, 120000);
+});
 </script>
 
 <template>
@@ -56,6 +77,7 @@ onMounted(() => { load(); setInterval(load, 120000); });
         <div class="flex gap-1 mt-1">
           <button @click="showDaily = true" class="px-2 py-0.5 border border-gray-300 rounded cursor-pointer hover:bg-gray-100">按日统计</button>
           <button @click="refresh" class="px-2 py-0.5 border border-gray-300 rounded cursor-pointer hover:bg-gray-100">刷新</button>
+          <button @click="openBall" class="ml-auto px-2 py-0.5 border border-gray-300 rounded cursor-pointer hover:bg-gray-100">悬浮球</button>
         </div>
       </template>
 

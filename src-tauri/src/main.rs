@@ -69,6 +69,28 @@ fn quit_app(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+fn pos_path() -> std::path::PathBuf {
+    let home = dirs::home_dir().expect("无法获取用户目录");
+    home.join(".deepseek_monitor").join("ball_pos")
+}
+
+#[tauri::command]
+fn save_ball_pos(x: i32, y: i32) -> Result<(), String> {
+    std::fs::write(pos_path(), format!("{} {}", x, y))
+        .map_err(|e| format!("保存位置失败: {}", e))
+}
+
+#[tauri::command]
+fn load_ball_pos() -> Result<Option<(i32, i32)>, String> {
+    let path = pos_path();
+    if !path.exists() { return Ok(None); }
+    let s = std::fs::read_to_string(&path).map_err(|e| format!("读取位置失败: {}", e))?;
+    let parts: Vec<&str> = s.trim().split_whitespace().collect();
+    if parts.len() < 2 { return Ok(None); }
+    let x = parts[0].parse::<i32>().map_err(|_| "解析坐标失败".to_string())?;
+    let y = parts[1].parse::<i32>().map_err(|_| "解析坐标失败".to_string())?;
+    Ok(Some((x, y)))
+}
 
 fn main() {
     init_panic_hook();
@@ -124,7 +146,7 @@ fn main() {
             config: cfg,
         })
         .invoke_handler(tauri::generate_handler![
-            ping, get_data, quit_app
+            ping, get_data, quit_app, save_ball_pos, load_ball_pos
         ])
         .run(tauri::generate_context!())
         .expect("启动失败");
