@@ -7,7 +7,6 @@
 
 DeepSeek 平台 API 用量桌面监控工具。实时查看 API 消耗、缓存命中率、余额等信息。
 
-![截图](https://via.placeholder.com/800x450?text=截图待补)
 
 ## 功能
 
