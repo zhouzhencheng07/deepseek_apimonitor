@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { getData, fmt, balance } from "./api.js";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { listen } from '@tauri-apps/api/event';
@@ -16,13 +17,41 @@ function hitRate(hit, total, output) {
 const d = ref(null);
 const err = ref("");
 const showDaily = ref(false);
+const showLogin = ref(false);
+const loginErr = ref("");
+const tokenInput = ref("");
 
 async function load() {
   err.value = "";
+  showLogin.value = false;
   try { d.value = await getData(); }
-  catch (e) { d.value = null; err.value = "数据加载失败: " + e; }
+  catch (e) {
+    d.value = null;
+    if (e === "NOT_LOGGED_IN") {
+      showLogin.value = true;
+    } else {
+      err.value = "数据加载失败: " + e;
+    }
+  }
 }
 function refresh() { load(); }
+
+function doLogin() {
+  loginErr.value = "";
+  invoke("start_login");
+}
+
+async function submitToken() {
+  const t = tokenInput.value.trim();
+  if (!t) { loginErr.value = "请输入 Token"; return; }
+  loginErr.value = "";
+  try {
+    await invoke("save_token_cmd", { token: t });
+    load();
+  } catch (e) {
+    loginErr.value = "保存失败: " + e;
+  }
+}
 
 async function openBall() {
   const existing = await WebviewWindow.getByLabel('ball');
@@ -38,6 +67,7 @@ async function openBall() {
 
 onMounted(() => {
   listen('focus-main', () => { appWindow.show(); appWindow.setFocus(); });
+  listen('login-success', () => { load(); });
   load();
   setInterval(load, 120000);
 });
@@ -45,7 +75,31 @@ onMounted(() => {
 
 <template>
   <div class="py-0.5 px-1 select-none font-sans text-xs">
-    <div v-if="err" class="text-red-500 mb-1">{{ err }}</div>
+    <div v-if="err && !showLogin" class="text-red-500 mb-1">{{ err }}</div>
+
+    <!-- 登录界面 -->
+    <div v-if="showLogin" class="flex flex-col px-2 py-1 select-none text-xs">
+      <div class="font-bold text-sm mb-1">首次使用：获取 DeepSeek 开发平台认证凭证</div>
+      <button @click="doLogin"
+        class="self-start px-3 py-1 bg-blue-500 text-white rounded cursor-pointer hover:bg-blue-600 mb-1 text-[11px]">
+        打开 DeepSeek 平台
+      </button>
+      <div class="text-gray-400 text-[10px] mb-1 leading-relaxed">
+        ① 浏览器登录后，F12 → 网络 → 刷新(F5)<br>
+        ② 点 get_user_summary → 请求标头<br>
+        ③ 找 Authorization: Bearer xxx → 复制 xxxx（获取完即可关浏览器）
+      </div>
+      <div class="flex gap-1">
+        <input v-model="tokenInput" type="text" placeholder="粘贴 xxx 到此处..."
+          class="flex-1 px-2 py-1 border border-gray-300 rounded outline-none focus:border-blue-400 text-[11px]" />
+        <button @click="submitToken"
+          class="px-3 py-1 bg-green-500 text-white rounded cursor-pointer hover:bg-green-600 text-[11px]">
+          保存
+        </button>
+      </div>
+      <div v-if="loginErr" class="text-red-500 mt-1">{{ loginErr }}</div>
+    </div>
+
     <div v-if="d">
       <template v-if="!showDaily">
         <div class="flex gap-1">

@@ -38,6 +38,3 @@ pub fn validate_token(token: &str, config: &Config) -> bool {
     }
 }
 
-pub fn extract_token(_config: &Config, _headless: bool) -> Option<String> {
-    None
-}

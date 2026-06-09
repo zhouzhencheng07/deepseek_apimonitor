@@ -1,8 +1,8 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     #[serde(rename = "USAGE_URL")]
     pub usage_url: String,
@@ -16,34 +16,41 @@ pub struct Config {
     pub refresh_interval: u64,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            usage_url: "https://platform.deepseek.com/usage".to_string(),
+            api_base: "https://platform.deepseek.com/api/v0".to_string(),
+            channel: "msedge".to_string(),
+            data_dir: ".browser_data".to_string(),
+            refresh_interval: 120,
+        }
+    }
+}
+
+fn cache_dir() -> PathBuf {
+    let home = dirs::home_dir().expect("无法获取用户目录");
+    home.join(".deepseek_monitor")
+}
+
+fn config_path() -> PathBuf {
+    cache_dir().join("config.json")
+}
+
 impl Config {
     pub fn load() -> Self {
-        // 从 exe 路径往上找 config.json（适配 dev/release 不同目录深度）
-        let exe_dir = std::env::current_exe().ok()
-            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-            .unwrap_or_default();
-
-        let mut candidates = vec![
-            PathBuf::from("config.json"),
-            PathBuf::from("../config.json"),
-        ];
-
-        // 从 exe 目录往上找 5 层
-        let mut d = exe_dir.clone();
-        for _ in 0..5 {
-            candidates.push(d.join("config.json"));
-            if let Some(parent) = d.parent() {
-                d = parent.to_path_buf();
-            }
+        let path = config_path();
+        if path.exists() {
+            let content = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("无法读取 {}: {}", path.display(), e));
+            return serde_json::from_str(&content).expect("config.json 格式错误");
         }
-
-        for p in &candidates {
-            if p.exists() {
-                let content = std::fs::read_to_string(p)
-                    .unwrap_or_else(|_| panic!("无法读取 config.json: {:?}", p));
-                return serde_json::from_str(&content).expect("config.json 格式错误");
-            }
+        // 首次运行，用默认值创建
+        let cfg = Config::default();
+        if let Ok(content) = serde_json::to_string_pretty(&cfg) {
+            let _ = std::fs::create_dir_all(cache_dir());
+            let _ = std::fs::write(&path, &content);
         }
-        panic!("找不到 config.json，请确保 config.json 在项目根目录\n搜索路径: {:?}", candidates);
+        cfg
     }
 }

@@ -6,7 +6,8 @@ mod data;
 mod token;
 
 use std::sync::Mutex;
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
+use tauri_plugin_opener::OpenerExt;
 
 #[cfg(windows)]
 fn init_panic_hook() {
@@ -52,6 +53,9 @@ fn ping(win: tauri::Window) -> String {
 fn get_data(state: State<AppState>) -> Result<String, String> {
     log("get_data 被调用");
     let token = state.token.lock().map_err(|e| { log(&format!("锁获取失败: {}", e)); e.to_string() })?;
+    if token.is_empty() {
+        return Err("NOT_LOGGED_IN".to_string());
+    }
     let cfg = &state.config;
 
     let raw = api::fetch_data(&token, cfg).map_err(|e| { log(&format!("API请求失败: {}", e)); format!("API 请求失败: {}", e) })?;
@@ -92,6 +96,26 @@ fn load_ball_pos() -> Result<Option<(i32, i32)>, String> {
     Ok(Some((x, y)))
 }
 
+#[tauri::command]
+fn start_login(app: tauri::AppHandle) -> Result<(), String> {
+    app.opener().open_url("https://platform.deepseek.com", None::<&str>)
+        .map_err(|e| format!("打开浏览器失败: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+fn save_token_cmd(app: tauri::AppHandle, token: String) -> Result<(), String> {
+    if token.len() < 20 {
+        return Err("Token 格式不正确".to_string());
+    }
+    token::save_token(&token);
+    if let Some(state) = app.try_state::<AppState>() {
+        *state.token.lock().unwrap() = token;
+    }
+    let _ = app.emit("login-success", "");
+    Ok(())
+}
+
 fn main() {
     init_panic_hook();
     log("=== 程序启动 ===");
@@ -100,36 +124,28 @@ fn main() {
     let cfg = config::Config::load();
     log("配置已加载");
 
-    let token = match token::load_token() {
-        Some(t) if token::validate_token(&t, &cfg) => {
-            log("Token 有效，直连 API");
-            t
-        }
-        _ => {
-            log("无有效 Token，尝试提取");
-            match token::extract_token(&cfg, true) {
-                Some(t) => {
-                    token::save_token(&t);
-                    log("Token 提取成功");
-                    t
-                }
-                None => {
-                    log("Token 提取失败");
-                    panic!("获取 Token 失败");
-                }
-            }
-        }
+    let token = token::load_token();
+    let has_valid = token.as_ref().map_or(false, |t| token::validate_token(t, &cfg));
+    let init_token = if has_valid {
+        log("Token 有效，直连 API");
+        token.unwrap()
+    } else {
+        log("无有效 Token");
+        String::new()
     };
 
-    log("获取数据...");
-    let report = api::fetch_data(&token, &cfg)
-        .ok()
-        .and_then(|raw| data::make_report_data(&raw));
-    log("数据获取完成");
+    let report = if has_valid {
+        api::fetch_data(&init_token, &cfg)
+            .ok()
+            .and_then(|raw| data::make_report_data(&raw))
+    } else {
+        None
+    };
 
     log("启动 Tauri GUI...");
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .on_window_event(|w, e| {
             if let tauri::WindowEvent::CloseRequested { .. } = e {
                 if w.label() == "main" {
@@ -141,12 +157,16 @@ fn main() {
             }
         })
         .manage(AppState {
-            token: Mutex::new(token),
+            token: Mutex::new(init_token),
             report: Mutex::new(report),
             config: cfg,
         })
+        .setup(|_app| {
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
-            ping, get_data, quit_app, save_ball_pos, load_ball_pos
+            ping, get_data, quit_app, save_ball_pos, load_ball_pos,
+            start_login, save_token_cmd
         ])
         .run(tauri::generate_context!())
         .expect("启动失败");
