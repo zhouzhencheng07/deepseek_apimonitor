@@ -11,9 +11,14 @@ const appWindow = getCurrentWindow();
 let timer = null;
 let unlisten = null;
 
-function startTimer() {
+async function startTimer() {
   if (timer) clearInterval(timer);
-  timer = setInterval(load, 120000);
+  try {
+    const interval = await invoke('get_refresh_interval');
+    timer = setInterval(load, interval * 1000);
+  } catch {
+    timer = setInterval(load, 120000);
+  }
 }
 
 function hitRate(hit, total, output) {
@@ -42,8 +47,6 @@ async function load() {
     }
   }
 }
-function refresh() { load(); }
-
 function doLogin() {
   loginErr.value = "";
   invoke("start_login");
@@ -148,7 +151,7 @@ onUnmounted(() => {
         </table>
         <div class="flex gap-1 mt-1">
           <button @click="showDaily = true" class="px-2 py-0.5 border border-gray-300 rounded cursor-pointer hover:bg-gray-100">按日统计</button>
-          <button @click="refresh" class="px-2 py-0.5 border border-gray-300 rounded cursor-pointer hover:bg-gray-100">刷新</button>
+          <button @click="load" class="px-2 py-0.5 border border-gray-300 rounded cursor-pointer hover:bg-gray-100">刷新</button>
           <button @click="openBall" class="ml-auto px-2 py-0.5 border border-gray-300 rounded cursor-pointer hover:bg-gray-100">悬浮球</button>
         </div>
       </template>

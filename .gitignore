@@ -1,23 +1,7 @@
-# 构建产物
 node_modules/
 dist/
 target/
-src-tauri/target/
-src-tauri/gen/
-
-# 系统 / 编辑器
-.vscode/
-.venv/
-__pycache__/
-*.pyc
 .browser_data/
-.idea/
-*.swp
-*.swo
-
-# Claude 本地设置
-CLAUDE.md
-.claude/
-
-# Plan mode 计划文件
-plans/
+.vscode/
+.qwenpaw/
+src-tauri/gen/

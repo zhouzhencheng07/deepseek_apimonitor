@@ -51,7 +51,12 @@ onMounted(async () => {
     await appWindow.setPosition(new PhysicalPosition(x, y));
   }
   load();
-  setInterval(load, 120000);
+  try {
+    const interval = await invoke('get_refresh_interval');
+    setInterval(load, interval * 1000);
+  } catch {
+    setInterval(load, 120000);
+  }
 });
 </script>
 

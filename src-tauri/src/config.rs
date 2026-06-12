@@ -1,17 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     #[serde(rename = "USAGE_URL")]
     pub usage_url: String,
     #[serde(rename = "API_BASE")]
     pub api_base: String,
-    #[serde(rename = "CHANNEL")]
-    pub channel: String,
-    #[serde(rename = "DATA_DIR")]
-    pub data_dir: String,
     #[serde(rename = "REFRESH_INTERVAL")]
     pub refresh_interval: u64,
 }
@@ -21,8 +16,6 @@ impl Default for Config {
         Config {
             usage_url: "https://platform.deepseek.com/usage".to_string(),
             api_base: "https://platform.deepseek.com/api/v0".to_string(),
-            channel: "msedge".to_string(),
-            data_dir: ".browser_data".to_string(),
             refresh_interval: 120,
         }
     }

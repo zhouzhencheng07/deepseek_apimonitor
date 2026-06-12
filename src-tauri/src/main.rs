@@ -50,15 +50,15 @@ fn ping(win: tauri::Window) -> String {
 }
 
 #[tauri::command]
-fn get_data(state: State<AppState>) -> Result<String, String> {
+async fn get_data(state: State<'_, AppState>) -> Result<String, String> {
     log("get_data 被调用");
-    let token = state.token.lock().map_err(|e| { log(&format!("锁获取失败: {}", e)); e.to_string() })?;
+    let token = state.token.lock().map_err(|e| { log(&format!("锁获取失败: {}", e)); e.to_string() })?.clone();
     if token.is_empty() {
         return Err("NOT_LOGGED_IN".to_string());
     }
     let cfg = &state.config;
 
-    let raw = api::fetch_data(&token, cfg).map_err(|e| {
+    let raw = api::fetch_data(&token, cfg).await.map_err(|e| {
         log(&format!("API请求失败: {}", e));
         if e == "TOKEN_INVALID" { e } else { format!("API 请求失败: {}", e) }
     })?;
@@ -100,6 +100,11 @@ fn load_ball_pos() -> Result<Option<(i32, i32)>, String> {
 }
 
 #[tauri::command]
+fn get_refresh_interval(state: State<AppState>) -> u64 {
+    state.config.refresh_interval
+}
+
+#[tauri::command]
 fn start_login(app: tauri::AppHandle) -> Result<(), String> {
     app.opener().open_url("https://platform.deepseek.com", None::<&str>)
         .map_err(|e| format!("打开浏览器失败: {}", e))?;
@@ -127,24 +132,14 @@ fn main() {
     let cfg = config::Config::load();
     log("配置已加载");
 
-    let token = token::load_token();
-    let has_valid = token.as_ref().map_or(false, |t| token::validate_token(t, &cfg));
-    let init_token = if has_valid {
-        log("Token 有效，直连 API");
-        token.unwrap()
+    let init_token = token::load_token().unwrap_or_default();
+    if init_token.is_empty() {
+        log("无 Token 文件，稍后提示登录");
     } else {
-        log("无有效 Token");
-        String::new()
-    };
+        log(&format!("Token 已加载（{} 字符），启动后验证", init_token.len()));
+    }
 
-    let report = if has_valid {
-        api::fetch_data(&init_token, &cfg)
-            .ok()
-            .and_then(|raw| data::make_report_data(&raw))
-    } else {
-        None
-    };
-
+    // 启动时不阻塞验证/fetch，交给前端 mount 后的 get_data 处理
     log("启动 Tauri GUI...");
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -161,7 +156,7 @@ fn main() {
         })
         .manage(AppState {
             token: Mutex::new(init_token),
-            report: Mutex::new(report),
+            report: Mutex::new(None),
             config: cfg,
         })
         .setup(|_app| {
@@ -169,7 +164,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             ping, get_data, quit_app, save_ball_pos, load_ball_pos,
-            start_login, save_token_cmd
+            get_refresh_interval, start_login, save_token_cmd
         ])
         .run(tauri::generate_context!())
         .expect("启动失败");
