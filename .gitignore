@@ -3,5 +3,4 @@ dist/
 target/
 .browser_data/
 .vscode/
-.qwenpaw/
 src-tauri/gen/
