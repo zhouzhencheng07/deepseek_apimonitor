@@ -11,6 +11,9 @@ pub fn api_get(path: &str, token: &str, config: &Config) -> Result<Value, String
         .send()
         .map_err(|e| format!("请求失败: {}", e))?;
 
+    if resp.status() == 401 {
+        return Err("TOKEN_INVALID".to_string());
+    }
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
     }

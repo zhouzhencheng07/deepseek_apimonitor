@@ -58,7 +58,10 @@ fn get_data(state: State<AppState>) -> Result<String, String> {
     }
     let cfg = &state.config;
 
-    let raw = api::fetch_data(&token, cfg).map_err(|e| { log(&format!("API请求失败: {}", e)); format!("API 请求失败: {}", e) })?;
+    let raw = api::fetch_data(&token, cfg).map_err(|e| {
+        log(&format!("API请求失败: {}", e));
+        if e == "TOKEN_INVALID" { e } else { format!("API 请求失败: {}", e) }
+    })?;
     let report = data::make_report_data(&raw).ok_or_else(|| { log("数据解析失败"); "数据解析失败".to_string() })?;
 
     *state.report.lock().map_err(|e| e.to_string())? = Some(report.clone());

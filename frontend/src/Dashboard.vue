@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { getData, fmt, balance } from "./api.js";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -7,6 +7,14 @@ import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { listen } from '@tauri-apps/api/event';
 
 const appWindow = getCurrentWindow();
+
+let timer = null;
+let unlisten = null;
+
+function startTimer() {
+  if (timer) clearInterval(timer);
+  timer = setInterval(load, 120000);
+}
 
 function hitRate(hit, total, output) {
   const d = total - output;
@@ -27,7 +35,7 @@ async function load() {
   try { d.value = await getData(); }
   catch (e) {
     d.value = null;
-    if (e === "NOT_LOGGED_IN") {
+    if (e === "NOT_LOGGED_IN" || e === "TOKEN_INVALID") {
       showLogin.value = true;
     } else {
       err.value = "数据加载失败: " + e;
@@ -66,10 +74,20 @@ async function openBall() {
 }
 
 onMounted(() => {
-  listen('focus-main', () => { appWindow.show(); appWindow.setFocus(); });
+  unlisten = listen('focus-main', () => {
+    appWindow.show();
+    appWindow.setFocus();
+    load();
+    startTimer();
+  });
   listen('login-success', () => { load(); });
   load();
-  setInterval(load, 120000);
+  startTimer();
+});
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer);
+  if (unlisten) unlisten.then(fn => fn());
 });
 </script>
 
