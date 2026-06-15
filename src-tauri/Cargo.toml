@@ -17,6 +17,8 @@ serde_json = "1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 dirs = "6"
 chrono = "0.4"
+# 只用 try_join! 宏做并发请求；runtime 由 tauri 提供，不需要 rt/multi-thread 等 feature。
+tokio = { version = "1", default-features = false, features = ["macros"] }
 
 [features]
 default = ["custom-protocol"]

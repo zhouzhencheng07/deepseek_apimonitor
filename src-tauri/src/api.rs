@@ -27,9 +27,16 @@ pub async fn fetch_data(client: &reqwest::Client, token: &str, config: &Config, 
     let now = Local::now();
     let month = now.format("%m").to_string();
     let year = now.format("%Y").to_string();
-    let amount = api_get(client, &endpoints.fill(&endpoints.amount_path, &month, &year), token, config).await?;
-    let cost = api_get(client, &endpoints.fill(&endpoints.cost_path, &month, &year), token, config).await?;
-    let summary = api_get(client, &endpoints.summary_path, token, config).await?;
+
+    // 三个请求互不依赖，并发发出，整体延迟由最慢的一个决定（原来串行是三者之和）。
+    // fill() 返回的 String 要先绑定，否则临时值在语句结束就释放，Future 还持有引用。
+    let amount_path = endpoints.fill(&endpoints.amount_path, &month, &year);
+    let cost_path = endpoints.fill(&endpoints.cost_path, &month, &year);
+    let amount = api_get(client, &amount_path, token, config);
+    let cost = api_get(client, &cost_path, token, config);
+    let summary = api_get(client, &endpoints.summary_path, token, config);
+
+    let (amount, cost, summary) = tokio::try_join!(amount, cost, summary)?;
 
     Ok(serde_json::json!({
         "amount": amount,

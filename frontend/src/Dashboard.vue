@@ -142,7 +142,7 @@ onUnmounted(() => {
           </tr></thead>
           <tbody>
             <tr><td class="pr-2">消费</td><td class="pr-2">{{ balance(d.month_cost) }}</td><td>{{ balance(d.today_cost) }}</td></tr>
-            <tr><td class="pr-2">Token</td><td class="pr-2">{{ d.month_tokens }}</td><td>{{ fmt(d.today_tokens) }}</td></tr>
+            <tr><td class="pr-2">Token</td><td class="pr-2">{{ fmt(d.month_tokens) }}</td><td>{{ fmt(d.today_tokens) }}</td></tr>
             <tr><td class="pr-2">命中</td><td class="pr-2">{{ d.month_hit }}</td><td>{{ d.today_hit }}</td></tr>
             <tr><td class="pr-2">输出</td><td class="pr-2">{{ fmt(d.month_out_tokens) }}</td><td>{{ fmt(d.today_out_tokens) }}</td></tr>
           </tbody>

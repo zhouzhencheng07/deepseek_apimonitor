@@ -12,8 +12,8 @@ export function balance(n) {
 }
 
 export async function getData() {
-  const raw = await invoke("get_data");
-  return JSON.parse(raw);
+  // 后端 get_data 直接返回 ReportData（Tauri 自动序列化），前端无需再 JSON.parse。
+  return invoke("get_data");
 }
 
 export function exitApp() {

@@ -58,7 +58,7 @@ fn ping(win: tauri::Window) -> String {
 }
 
 #[tauri::command]
-async fn get_data(state: State<'_, AppState>) -> Result<String, String> {
+async fn get_data(state: State<'_, AppState>) -> Result<data::ReportData, String> {
     log("get_data 被调用");
     let token = state.token.lock().map_err(|e| { log(&format!("锁获取失败: {}", e)); e.to_string() })?.clone();
     if token.is_empty() {
@@ -76,7 +76,7 @@ async fn get_data(state: State<'_, AppState>) -> Result<String, String> {
 
     *state.report.lock().map_err(|e| e.to_string())? = Some(report.clone());
 
-    serde_json::to_string(&report).map_err(|e| { log(&format!("序列化失败: {}", e)); e.to_string() })
+    Ok(report)
 }
 
 #[tauri::command]
