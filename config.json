@@ -1,7 +1,5 @@
 {
   "USAGE_URL": "https://platform.deepseek.com/usage",
   "API_BASE": "https://platform.deepseek.com/api/v0",
-  "CHANNEL": "msedge",
-  "DATA_DIR": ".browser_data",
   "REFRESH_INTERVAL": 120
 }

@@ -10,13 +10,16 @@ const appWindow = getCurrentWindow();
 
 let timer = null;
 let unlisten = null;
+const intervalSec = ref(120);
 
 async function startTimer() {
   if (timer) clearInterval(timer);
   try {
     const interval = await invoke('get_refresh_interval');
+    intervalSec.value = interval;
     timer = setInterval(load, interval * 1000);
   } catch {
+    intervalSec.value = 120;
     timer = setInterval(load, 120000);
   }
 }
@@ -125,7 +128,7 @@ onUnmounted(() => {
       <template v-if="!showDaily">
         <div class="flex gap-1">
           <span class="font-bold text-sm">[余额] {{ balance(d.balance) }}</span>
-          <span class="text-gray-400 text-[10px] leading-[18px]">{{ d.update_time }} 每120s</span>
+          <span class="text-gray-400 text-[10px] leading-[18px]">{{ d.update_time }} 每{{ intervalSec }}s</span>
         </div>
         <table>
           <thead><tr class="text-left">

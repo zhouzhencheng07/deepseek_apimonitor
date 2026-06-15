@@ -7,6 +7,7 @@ mod endpoints;
 mod token;
 
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
@@ -30,6 +31,10 @@ fn init_panic_hook() {}
 
 fn log(msg: &str) {
     let log_path = std::env::temp_dir().join("deepseek-monitor.log");
+    // 超过 1MB 就清空，避免长期运行无限增长。用 try_ 不让日志本身搞崩程序。
+    if log_path.metadata().map(|m| m.len() > 1_048_576).unwrap_or(false) {
+        let _ = std::fs::write(&log_path, "");
+    }
     if let Ok(f) = std::fs::OpenOptions::new()
         .create(true).append(true).open(&log_path)
     {
@@ -43,6 +48,7 @@ struct AppState {
     report: Mutex<Option<data::ReportData>>,
     config: config::Config,
     endpoints: endpoints::Endpoints,
+    client: reqwest::Client,
 }
 
 #[tauri::command]
@@ -60,8 +66,9 @@ async fn get_data(state: State<'_, AppState>) -> Result<String, String> {
     }
     let cfg = &state.config;
     let endpoints = &state.endpoints;
+    let client = &state.client;
 
-    let raw = api::fetch_data(&token, cfg, endpoints).await.map_err(|e| {
+    let raw = api::fetch_data(client, &token, cfg, endpoints).await.map_err(|e| {
         log(&format!("API请求失败: {}", e));
         if e == "TOKEN_INVALID" { e } else { format!("API 请求失败: {}", e) }
     })?;
@@ -121,7 +128,7 @@ fn save_token_cmd(app: tauri::AppHandle, token: String) -> Result<(), String> {
     }
     token::save_token(&token);
     if let Some(state) = app.try_state::<AppState>() {
-        *state.token.lock().unwrap() = token;
+        *state.token.lock().map_err(|e| format!("更新 Token 失败: {}", e))? = token;
     }
     let _ = app.emit("login-success", "");
     Ok(())
@@ -138,6 +145,12 @@ fn main() {
     log("加载 endpoints...");
     let eps = endpoints::Endpoints::load();
     log("endpoints 已加载");
+
+    // 复用单个 Client（含连接池与 timeout），避免每次请求重建 TLS 栈。
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .expect("构建 HTTP Client 失败");
 
     let init_token = token::load_token().unwrap_or_default();
     if init_token.is_empty() {
@@ -166,6 +179,7 @@ fn main() {
             report: Mutex::new(None),
             config: cfg,
             endpoints: eps,
+            client,
         })
         .setup(|_app| {
             Ok(())

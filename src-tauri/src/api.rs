@@ -4,9 +4,8 @@ use serde_json::Value;
 use crate::config::Config;
 use crate::endpoints::Endpoints;
 
-pub async fn api_get(path: &str, token: &str, config: &Config) -> Result<Value, String> {
+pub async fn api_get(client: &reqwest::Client, path: &str, token: &str, config: &Config) -> Result<Value, String> {
     let url = format!("{}{}", config.api_base, path);
-    let client = reqwest::Client::new();
     let resp = client
         .get(&url)
         .bearer_auth(token)
@@ -24,13 +23,13 @@ pub async fn api_get(path: &str, token: &str, config: &Config) -> Result<Value, 
     resp.json::<Value>().await.map_err(|e| format!("JSON 解析失败: {}", e))
 }
 
-pub async fn fetch_data(token: &str, config: &Config, endpoints: &Endpoints) -> Result<serde_json::Value, String> {
+pub async fn fetch_data(client: &reqwest::Client, token: &str, config: &Config, endpoints: &Endpoints) -> Result<serde_json::Value, String> {
     let now = Local::now();
     let month = now.format("%m").to_string();
     let year = now.format("%Y").to_string();
-    let amount = api_get(&endpoints.fill(&endpoints.amount_path, &month, &year), token, config).await?;
-    let cost = api_get(&endpoints.fill(&endpoints.cost_path, &month, &year), token, config).await?;
-    let summary = api_get(&endpoints.summary_path, token, config).await?;
+    let amount = api_get(client, &endpoints.fill(&endpoints.amount_path, &month, &year), token, config).await?;
+    let cost = api_get(client, &endpoints.fill(&endpoints.cost_path, &month, &year), token, config).await?;
+    let summary = api_get(client, &endpoints.summary_path, token, config).await?;
 
     Ok(serde_json::json!({
         "amount": amount,
