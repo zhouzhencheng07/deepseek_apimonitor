@@ -72,7 +72,7 @@ async fn get_data(state: State<'_, AppState>) -> Result<String, String> {
         log(&format!("API请求失败: {}", e));
         if e == "TOKEN_INVALID" { e } else { format!("API 请求失败: {}", e) }
     })?;
-    let report = data::make_report_data(&raw, &endpoints.token_types).ok_or_else(|| { log("数据解析失败"); "数据解析失败".to_string() })?;
+    let report = data::make_report_data(&raw, endpoints).ok_or_else(|| { log("数据解析失败"); "数据解析失败".to_string() })?;
 
     *state.report.lock().map_err(|e| e.to_string())? = Some(report.clone());
 

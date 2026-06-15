@@ -24,6 +24,10 @@ async function startTimer() {
   }
 }
 
+function stopTimer() {
+  if (timer) { clearInterval(timer); timer = null; }
+}
+
 function hitRate(hit, total, output) {
   const d = total - output;
   if (d <= 0) return 'N/A';
@@ -69,7 +73,7 @@ async function submitToken() {
 
 async function openBall() {
   const existing = await WebviewWindow.getByLabel('ball');
-  if (existing) { appWindow.hide(); return; }
+  if (existing) { appWindow.hide(); stopTimer(); return; }
   new WebviewWindow('ball', {
     url: '/?ball',
     width: 105, height: 55,
@@ -77,6 +81,8 @@ async function openBall() {
     alwaysOnTop: true, skipTaskbar: true,
   });
   appWindow.hide();
+  // 主窗口隐藏后由悬浮球窗口负责轮询，这里停掉自己的 timer，避免重复请求翻倍。
+  stopTimer();
 }
 
 onMounted(() => {

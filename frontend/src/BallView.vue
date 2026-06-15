@@ -13,8 +13,14 @@ let dragStart = null;
 let dragMoved = false;
 
 async function load() {
-  try { d.value = await getData(); }
-  catch { /* ignore */ }
+  try {
+    d.value = await getData();
+  } catch (e) {
+    // token 失效：唤起主窗口弹登录，悬浮球自身不静默卡在旧数据。
+    if (e === "TOKEN_INVALID" || e === "NOT_LOGGED_IN") {
+      emit('focus-main');
+    }
+  }
 }
 
 function onDown(e) {

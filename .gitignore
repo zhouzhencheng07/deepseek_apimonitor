@@ -4,3 +4,4 @@ target/
 .browser_data/
 .vscode/
 src-tauri/gen/
+todo.md

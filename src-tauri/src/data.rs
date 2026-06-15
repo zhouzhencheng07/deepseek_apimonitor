@@ -2,7 +2,7 @@ use chrono::Local;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::endpoints::TokenTypes;
+use crate::endpoints::Endpoints;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelDetail {
@@ -45,7 +45,8 @@ pub struct ReportData {
     pub update_time: String,
 }
 
-pub fn make_report_data(raw: &Value, tt: &TokenTypes) -> Option<ReportData> {
+pub fn make_report_data(raw: &Value, endpoints: &Endpoints) -> Option<ReportData> {
+    let tt = &endpoints.token_types;
     let biz = raw["summary"]["data"]["biz_data"].as_object()?;
     let balance = biz["normal_wallets"][0]["balance"]
         .as_str().unwrap_or("0").parse::<f64>().ok()?;
@@ -55,6 +56,14 @@ pub fn make_report_data(raw: &Value, tt: &TokenTypes) -> Option<ReportData> {
 
     let amt_biz = raw["amount"]["data"]["biz_data"].as_object()?;
     let total_list = amt_biz["total"].as_array()?;
+
+    // 先收集本次接口实际出现的所有 model 名，再用 whitelist 过滤出展示集。
+    // whitelist 空 / 全没命中时回退到全部，避免静默丢数据。
+    let recognized: Vec<String> = total_list
+        .iter()
+        .filter_map(|m| m["model"].as_str().map(|s| s.to_string()))
+        .collect();
+    let show: std::collections::HashSet<String> = endpoints.filter_models(&recognized).into_iter().collect();
 
     let mut all_hit = 0u64; let mut all_miss = 0u64; let mut all_resp = 0u64;
     for m in total_list {
@@ -145,7 +154,7 @@ pub fn make_report_data(raw: &Value, tt: &TokenTypes) -> Option<ReportData> {
         if let Some(data) = d["data"].as_array() {
             for m in data {
                 let name = m["model"].as_str().unwrap_or("").to_string();
-                if name.to_lowercase().contains("chat") || name.to_lowercase().contains("reasoner") { continue; }
+                if !show.contains(&name) { continue; }
                 let mut cost = 0.0;
                 if let Some(usage) = m["usage"].as_array() {
                     for u in usage {
@@ -164,7 +173,7 @@ pub fn make_report_data(raw: &Value, tt: &TokenTypes) -> Option<ReportData> {
         if let Some(data) = d["data"].as_array() {
             for m in data {
                 let name = m["model"].as_str().unwrap_or("").to_string();
-                if name.to_lowercase().contains("chat") || name.to_lowercase().contains("reasoner") { continue; }
+                if !show.contains(&name) { continue; }
                 let mut toks = 0u64; let mut hit = 0u64; let mut resp = 0u64;
                 if let Some(usage) = m["usage"].as_array() {
                     for u in usage {
@@ -191,7 +200,7 @@ pub fn make_report_data(raw: &Value, tt: &TokenTypes) -> Option<ReportData> {
     let mut cost_map = std::collections::HashMap::new();
     for m in cost_total {
         let name = m["model"].as_str().unwrap_or("").to_string();
-        if name.to_lowercase().contains("chat") || name.to_lowercase().contains("reasoner") { continue; }
+        if !show.contains(&name) { continue; }
         let mut cost = 0.0;
         if let Some(usage) = m["usage"].as_array() {
             for u in usage {
@@ -206,7 +215,7 @@ pub fn make_report_data(raw: &Value, tt: &TokenTypes) -> Option<ReportData> {
     let mut models = Vec::new();
     for m in total_list {
         let name = m["model"].as_str().unwrap_or("").to_string();
-        if name.to_lowercase().contains("chat") || name.to_lowercase().contains("reasoner") { continue; }
+        if !show.contains(&name) { continue; }
         let mut hit = 0u64; let mut miss = 0u64; let mut resp = 0u64;
         if let Some(usage) = m["usage"].as_array() {
             for u in usage {
