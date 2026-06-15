@@ -1,0 +1,11 @@
+{
+  "amount_path": "/usage/amount?month={month}&year={year}",
+  "cost_path": "/usage/cost?month={month}&year={year}",
+  "summary_path": "/users/get_user_summary",
+  "token_types": {
+    "cache_hit": "PROMPT_CACHE_HIT_TOKEN",
+    "cache_miss": "PROMPT_CACHE_MISS_TOKEN",
+    "response": "RESPONSE_TOKEN",
+    "request": "REQUEST"
+  }
+}

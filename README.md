@@ -70,8 +70,32 @@ npx tauri build
 | 文件 | 说明 |
 |------|------|
 | `config.json` | 用户配置 |
+| `endpoints.json` | 接口路径与 token type 常量（DeepSeek 改接口时可自行编辑，重启生效） |
 | `token` | 认证凭证（Authorization 的 Bearer 值） |
 | `ball_pos` | 悬浮球位置 |
+
+### endpoints.json 说明
+
+DeepSeek 平台的用量接口属于内部私有接口，路径和字段 type 名偶尔会变。`endpoints.json` 把这些**易变项外置**，无需重新编译即可适配：
+
+```json
+{
+  "amount_path":  "/usage/amount?month={month}&year={year}",
+  "cost_path":    "/usage/cost?month={month}&year={year}",
+  "summary_path": "/users/get_user_summary",
+  "token_types": {
+    "cache_hit":  "PROMPT_CACHE_HIT_TOKEN",
+    "cache_miss": "PROMPT_CACHE_MISS_TOKEN",
+    "response":   "RESPONSE_TOKEN",
+    "request":    "REQUEST"
+  }
+}
+```
+
+- 路径中的 `{month}` / `{year}` 为占位符，启动时自动填充当前年月；不支持其它占位符。
+- `token_types` 是 usage 数组里区分 token 类型的字段值（缓存命中、未命中、输出、请求数）。
+- 编辑后**重启程序生效**；写错某项时该字段自动回退默认值，不会导致崩溃。
+- 仓库根的 `endpoints.json` 仅为模板参考，运行时实际读取的是 `~/.deepseek_monitor/endpoints.json`。
 
 ## 技术栈
 
@@ -90,6 +114,7 @@ deepseek-monitor/
 │   └── src/
 │       ├── main.rs         Tauri 入口 + 命令
 │       ├── config.rs       配置加载
+│       ├── endpoints.rs    接口路径/token type 常量（可外置配置）
 │       ├── token.rs        Token 缓存/验证
 │       ├── api.rs          HTTP API 请求
 │       └── data.rs         数据处理
@@ -100,6 +125,7 @@ deepseek-monitor/
 │       ├── DailyView.vue   按日统计
 │       └── BallView.vue    悬浮球窗口
 ├── config.json             配置模板（运行时在 ~/.deepseek_monitor/config.json）
+├── endpoints.json          接口路径模板（运行时在 ~/.deepseek_monitor/endpoints.json）
 ├── package.json            Node 依赖
 └── vite.config.js          构建配置
 ```

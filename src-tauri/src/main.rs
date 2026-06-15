@@ -3,6 +3,7 @@
 mod api;
 mod config;
 mod data;
+mod endpoints;
 mod token;
 
 use std::sync::Mutex;
@@ -41,6 +42,7 @@ struct AppState {
     token: Mutex<String>,
     report: Mutex<Option<data::ReportData>>,
     config: config::Config,
+    endpoints: endpoints::Endpoints,
 }
 
 #[tauri::command]
@@ -57,12 +59,13 @@ async fn get_data(state: State<'_, AppState>) -> Result<String, String> {
         return Err("NOT_LOGGED_IN".to_string());
     }
     let cfg = &state.config;
+    let endpoints = &state.endpoints;
 
-    let raw = api::fetch_data(&token, cfg).await.map_err(|e| {
+    let raw = api::fetch_data(&token, cfg, endpoints).await.map_err(|e| {
         log(&format!("API请求失败: {}", e));
         if e == "TOKEN_INVALID" { e } else { format!("API 请求失败: {}", e) }
     })?;
-    let report = data::make_report_data(&raw).ok_or_else(|| { log("数据解析失败"); "数据解析失败".to_string() })?;
+    let report = data::make_report_data(&raw, &endpoints.token_types).ok_or_else(|| { log("数据解析失败"); "数据解析失败".to_string() })?;
 
     *state.report.lock().map_err(|e| e.to_string())? = Some(report.clone());
 
@@ -132,6 +135,10 @@ fn main() {
     let cfg = config::Config::load();
     log("配置已加载");
 
+    log("加载 endpoints...");
+    let eps = endpoints::Endpoints::load();
+    log("endpoints 已加载");
+
     let init_token = token::load_token().unwrap_or_default();
     if init_token.is_empty() {
         log("无 Token 文件，稍后提示登录");
@@ -158,6 +165,7 @@ fn main() {
             token: Mutex::new(init_token),
             report: Mutex::new(None),
             config: cfg,
+            endpoints: eps,
         })
         .setup(|_app| {
             Ok(())
