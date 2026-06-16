@@ -245,3 +245,212 @@ pub fn make_report_data(raw: &Value, endpoints: &Endpoints) -> Option<ReportData
         update_time: Local::now().format("%m-%d %H:%M").to_string(),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use crate::endpoints::Endpoints;
+
+    /// 构造一个通用的 mock API 响应，两个模型、一天数据。
+    fn mock_api_data() -> Value {
+        let amount_days = vec![json!({
+            "date": "2026-06-15",
+            "data": [{
+                "model": "deepseek-v4-flash",
+                "usage": [
+                    {"type": "PROMPT_CACHE_HIT_TOKEN", "amount": "30"},
+                    {"type": "PROMPT_CACHE_MISS_TOKEN", "amount": "60"},
+                    {"type": "RESPONSE_TOKEN", "amount": "20"}
+                ]
+            }]
+        })];
+        let cost_days = vec![json!({
+            "date": "2026-06-15",
+            "data": [{
+                "model": "deepseek-v4-flash",
+                "usage": [
+                    {"type": "PROMPT_CACHE_HIT_TOKEN", "amount": "0.0005"},
+                    {"type": "PROMPT_CACHE_MISS_TOKEN", "amount": "0.0010"},
+                    {"type": "RESPONSE_TOKEN", "amount": "0.0003"},
+                    {"type": "REQUEST", "amount": "1"}
+                ]
+            }]
+        })];
+        json!({
+            "summary": {
+                "data": {
+                    "biz_data": {
+                        "normal_wallets": [{"balance": "100.50"}],
+                        "monthly_costs": [{"amount": "12.34"}],
+                        "monthly_token_usage": "500000"
+                    }
+                }
+            },
+            "amount": {
+                "data": {
+                    "biz_data": {
+                        "total": [
+                            {
+                                "model": "deepseek-v4-flash",
+                                "usage": [
+                                    {"type": "PROMPT_CACHE_HIT_TOKEN", "amount": "100"},
+                                    {"type": "PROMPT_CACHE_MISS_TOKEN", "amount": "200"},
+                                    {"type": "RESPONSE_TOKEN", "amount": "50"}
+                                ]
+                            },
+                            {
+                                "model": "deepseek-v4-pro",
+                                "usage": [
+                                    {"type": "PROMPT_CACHE_HIT_TOKEN", "amount": "0"},
+                                    {"type": "PROMPT_CACHE_MISS_TOKEN", "amount": "0"},
+                                    {"type": "RESPONSE_TOKEN", "amount": "0"}
+                                ]
+                            }
+                        ],
+                        "days": amount_days
+                    }
+                }
+            },
+            "cost": {
+                "data": {
+                    "biz_data": [{
+                        "total": [{
+                            "model": "deepseek-v4-flash",
+                            "usage": [
+                                {"type": "PROMPT_CACHE_HIT_TOKEN", "amount": "0.0015"},
+                                {"type": "PROMPT_CACHE_MISS_TOKEN", "amount": "0.0030"},
+                                {"type": "RESPONSE_TOKEN", "amount": "0.0010"},
+                                {"type": "REQUEST", "amount": "1"}
+                            ]
+                        }],
+                        "days": cost_days
+                    }]
+                }
+            }
+        })
+    }
+
+    #[test]
+    fn test_parse_basic() {
+        let raw = mock_api_data();
+        let eps = Endpoints::default();
+        let r = make_report_data(&raw, &eps).unwrap();
+
+        assert_eq!(r.balance, 100.50);
+        assert_eq!(r.month_cost, 12.34);
+        assert_eq!(r.month_tokens, 500000);
+        assert_eq!(r.month_out_tokens, 50);
+        assert_eq!(r.month_hit, "33.3%");
+        assert_eq!(r.today_label, "2026-06-15");
+        assert!((r.today_cost - 0.0018).abs() < 1e-10, "today_cost {} != 0.0018", r.today_cost);
+        assert_eq!(r.today_tokens, 110);
+        assert_eq!(r.today_hit, "33.3%");
+        assert_eq!(r.today_out_tokens, 20);
+
+        // 两个模型
+        assert_eq!(r.models.len(), 2);
+        let flash = r.models.iter().find(|m| m.name == "deepseek-v4-flash").unwrap();
+        assert_eq!(flash.total_tokens, 350);
+        assert_eq!(flash.cache_hit, 100);
+        assert_eq!(flash.cache_miss, 200);
+        assert_eq!(flash.output_tokens, 50);
+        assert!((flash.cost - 0.0055).abs() < 1e-10, "cost {} != 0.0055", flash.cost);
+        assert_eq!(flash.today_tokens, 110);
+        assert_eq!(flash.today_hit, 30);
+        assert_eq!(flash.today_output_tokens, 20);
+        assert!((flash.today_cost - 0.0018).abs() < 1e-10, "today_cost {} != 0.0018", flash.today_cost);
+
+        // pro 没有数据
+        let pro = r.models.iter().find(|m| m.name == "deepseek-v4-pro").unwrap();
+        assert_eq!(pro.total_tokens, 0);
+        assert_eq!(pro.cost, 0.0);
+
+        // 每日明细
+        assert_eq!(r.daily.len(), 1);
+        assert_eq!(r.daily[0].date, "2026-06-15");
+        assert_eq!(r.daily[0].total_tokens, 110);
+        assert_eq!(r.daily[0].hit_rate, "33.3%");
+        assert!((r.daily[0].cost - 0.0018).abs() < 1e-10, "cost {} != 0.0018", r.daily[0].cost);
+    }
+
+    #[test]
+    fn test_whitelist_empty() {
+        // whitelist 空 → 显示全部
+        let raw = mock_api_data();
+        let eps = Endpoints::default(); // whitelist = vec![]
+        let r = make_report_data(&raw, &eps).unwrap();
+        assert_eq!(r.models.len(), 2);
+    }
+
+    #[test]
+    fn test_whitelist_matching() {
+        // whitelist 命中 → 只显示匹配的
+        let raw = mock_api_data();
+        let mut eps = Endpoints::default();
+        eps.whitelist = vec!["deepseek-v4-flash".to_string()];
+        let r = make_report_data(&raw, &eps).unwrap();
+        assert_eq!(r.models.len(), 1);
+        assert_eq!(r.models[0].name, "deepseek-v4-flash");
+    }
+
+    #[test]
+    fn test_whitelist_none_match() {
+        // whitelist 全没命中 → 回退到全部
+        let raw = mock_api_data();
+        let mut eps = Endpoints::default();
+        eps.whitelist = vec!["nonexistent-model".to_string()];
+        let r = make_report_data(&raw, &eps).unwrap();
+        assert_eq!(r.models.len(), 2);
+    }
+
+    #[test]
+    fn test_no_data() {
+        // 空数据 → None
+        let raw = json!({});
+        let eps = Endpoints::default();
+        assert!(make_report_data(&raw, &eps).is_none());
+    }
+
+    #[test]
+    fn test_hit_rate_na() {
+        let raw = json!({
+            "summary": {
+                "data": {
+                    "biz_data": {
+                        "normal_wallets": [{"balance": "0"}],
+                        "monthly_costs": [{"amount": "0"}],
+                        "monthly_token_usage": "0"
+                    }
+                }
+            },
+            "amount": {
+                "data": {
+                    "biz_data": {
+                        "total": [{
+                            "model": "test-model",
+                            "usage": [
+                                {"type": "PROMPT_CACHE_HIT_TOKEN", "amount": "0"},
+                                {"type": "PROMPT_CACHE_MISS_TOKEN", "amount": "0"},
+                                {"type": "RESPONSE_TOKEN", "amount": "0"}
+                            ]
+                        }],
+                        "days": []
+                    }
+                }
+            },
+            "cost": {
+                "data": {
+                    "biz_data": [[{
+                        "total": [],
+                        "days": []
+                    }]]
+                }
+            }
+        });
+        let eps = Endpoints::default();
+        let r = make_report_data(&raw, &eps).unwrap();
+        assert_eq!(r.month_hit, "N/A");
+        assert_eq!(r.today_hit, "N/A");
+    }
+}

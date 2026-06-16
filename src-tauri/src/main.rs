@@ -84,7 +84,7 @@ fn quit_app(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 fn pos_path() -> std::path::PathBuf {
-    let home = dirs::home_dir().expect("无法获取用户目录");
+    let home = dirs::home_dir().unwrap_or_else(std::env::temp_dir);
     home.join(".deepseek_monitor").join("ball_pos")
 }
 

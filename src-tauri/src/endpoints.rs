@@ -100,7 +100,7 @@ fn dedup_preserve_order(names: &[String]) -> Vec<String> {
 }
 
 fn cache_dir() -> PathBuf {
-    let home = dirs::home_dir().expect("无法获取用户目录");
+    let home = dirs::home_dir().unwrap_or_else(std::env::temp_dir);
     home.join(".deepseek_monitor")
 }
 
