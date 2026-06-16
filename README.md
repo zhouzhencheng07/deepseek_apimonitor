@@ -119,16 +119,18 @@ deepseek-monitor/
 │   └── src/
 │       ├── main.rs         Tauri 入口 + 命令
 │       ├── config.rs       配置加载
-│       ├── endpoints.rs    接口路径/token type 常量（可外置配置）
-│       ├── token.rs        Token 缓存/验证
-│       ├── api.rs          HTTP API 请求
-│       └── data.rs         数据处理
+│       ├── endpoints.rs    接口路径/白名单/token type 常量（可外置配置）
+│       ├── token.rs        Token 加载/保存
+│       ├── api.rs           HTTP API 请求（并发）
+│       └── data.rs          数据处理与统计
 ├── frontend/               Vue 3 前端
+│   ├── index.html
 │   └── src/
-│       ├── Dashboard.vue   主界面
-│       ├── ModelsView.vue  按模型统计
-│       ├── DailyView.vue   按日统计
-│       └── BallView.vue    悬浮球窗口
+│       ├── main.js          入口（路由 Dashboard / BallView）
+│       ├── style.css        Tailwind 全局样式
+│       ├── api.js           Tauri 命令封装
+│       ├── Dashboard.vue    主界面（仪表盘 + 按模型/按日统计）
+│       └── BallView.vue     悬浮球窗口
 ├── config.json             配置模板（运行时在 ~/.deepseek_monitor/config.json）
 ├── endpoints.json          接口路径模板（运行时在 ~/.deepseek_monitor/endpoints.json）
 ├── package.json            Node 依赖

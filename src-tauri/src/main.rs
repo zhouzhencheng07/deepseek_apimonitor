@@ -30,7 +30,10 @@ fn init_panic_hook() {
 fn init_panic_hook() {}
 
 fn log(msg: &str) {
-    let log_path = std::env::temp_dir().join("deepseek-monitor.log");
+    // 放在 ~/.deepseek_monitor/ 下，与 config/token 等数据一致，不受系统 temp 清理影响。
+    let log_dir = dirs::home_dir().map(|h| h.join(".deepseek_monitor"))
+        .unwrap_or_else(std::env::temp_dir);
+    let log_path = log_dir.join("deepseek-monitor.log");
     // 超过 1MB 就清空，避免长期运行无限增长。用 try_ 不让日志本身搞崩程序。
     if log_path.metadata().map(|m| m.len() > 1_048_576).unwrap_or(false) {
         let _ = std::fs::write(&log_path, "");
@@ -49,12 +52,6 @@ struct AppState {
     config: config::Config,
     endpoints: endpoints::Endpoints,
     client: reqwest::Client,
-}
-
-#[tauri::command]
-fn ping(win: tauri::Window) -> String {
-    log(&format!("ping 被调用, 来自窗口: {}", win.label()));
-    "pong".to_string()
 }
 
 #[tauri::command]
@@ -185,7 +182,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            ping, get_data, quit_app, save_ball_pos, load_ball_pos,
+            get_data, quit_app, save_ball_pos, load_ball_pos,
             get_refresh_interval, start_login, save_token_cmd
         ])
         .run(tauri::generate_context!())
