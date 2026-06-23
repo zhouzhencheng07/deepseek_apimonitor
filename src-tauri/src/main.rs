@@ -77,6 +77,11 @@ async fn get_data(state: State<'_, AppState>) -> Result<data::ReportData, String
 }
 
 #[tauri::command]
+fn get_cached_data(state: State<AppState>) -> Result<Option<data::ReportData>, String> {
+    Ok(state.report.lock().map_err(|e| e.to_string())?.clone())
+}
+
+#[tauri::command]
 fn quit_app(app: tauri::AppHandle) -> Result<(), String> {
     log("quit_app 被调用，退出程序");
     app.exit(0);
@@ -182,7 +187,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            get_data, quit_app, save_ball_pos, load_ball_pos,
+            get_data, get_cached_data, quit_app, save_ball_pos, load_ball_pos,
             get_refresh_interval, start_login, save_token_cmd
         ])
         .run(tauri::generate_context!())

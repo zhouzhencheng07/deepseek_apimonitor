@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue";
-import { getData, fmt, balance } from "./api.js";
+import { getData, getCachedData, fmt, balance } from "./api.js";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
@@ -74,18 +74,24 @@ async function submitToken() {
 async function openBall() {
   const existing = await WebviewWindow.getByLabel('ball');
   if (existing) { appWindow.hide(); stopTimer(); return; }
+  // 创建前加载上次保存的位置，传入 x/y 避免窗口先出现于默认位置再跳跃
+  const pos = await invoke('load_ball_pos');
   new WebviewWindow('ball', {
     url: '/?ball',
     width: 105, height: 55,
     decorations: false,
     alwaysOnTop: true, skipTaskbar: true,
+    ...(pos ? { x: pos[0], y: pos[1] } : {}),
   });
   appWindow.hide();
   // 主窗口隐藏后由悬浮球窗口负责轮询，这里停掉自己的 timer，避免重复请求翻倍。
   stopTimer();
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // 优先展示缓存数据，瞬时渲染，避免白屏
+  const cached = await getCachedData();
+  if (cached) d.value = cached;
   unlisten = listen('focus-main', () => {
     appWindow.show();
     appWindow.setFocus();

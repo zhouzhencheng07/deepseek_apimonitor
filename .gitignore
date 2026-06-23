@@ -1,7 +1,29 @@
-node_modules/
-dist/
-target/
-.browser_data/
-.vscode/
-src-tauri/gen/
+# 项目文档
 todo.md
+momery.md
+agent.md
+
+# Rust / Tauri 构建产物
+src-tauri/target/
+src-tauri/gen/
+
+# 前端构建产物
+dist/
+node_modules/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 环境
+.env
+.env.local
+
+# 杂项
+nul

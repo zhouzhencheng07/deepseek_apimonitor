@@ -1,9 +1,8 @@
 <script setup>
 import { ref, onMounted } from "vue";
-import { getData, fmt, balance } from "./api.js";
+import { getData, getCachedData, fmt, balance } from "./api.js";
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { PhysicalPosition } from '@tauri-apps/api/dpi';
 import { emit } from '@tauri-apps/api/event';
 
 const appWindow = getCurrentWindow();
@@ -51,12 +50,12 @@ async function onUp() {
 }
 
 onMounted(async () => {
-  const pos = await invoke('load_ball_pos');
-  if (pos) {
-    const [x, y] = pos;
-    await appWindow.setPosition(new PhysicalPosition(x, y));
-  }
+  // 优先展示缓存数据，瞬时渲染，避免白屏
+  const cached = await getCachedData();
+  if (cached) d.value = cached;
+  // 异步拉取最新数据
   load();
+  // 启动轮询
   try {
     const interval = await invoke('get_refresh_interval');
     setInterval(load, interval * 1000);

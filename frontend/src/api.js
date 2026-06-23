@@ -16,6 +16,11 @@ export async function getData() {
   return invoke("get_data");
 }
 
+export async function getCachedData() {
+  // 返回后端 AppState.report 中的缓存数据，不发起 HTTP 请求
+  return invoke("get_cached_data");
+}
+
 export function exitApp() {
   invoke("quit_app");
 }
