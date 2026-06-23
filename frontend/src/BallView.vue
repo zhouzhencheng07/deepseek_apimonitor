@@ -51,12 +51,13 @@ async function onUp() {
 }
 
 onMounted(async () => {
-  // 恢复上次保存的位置（兜底：若创建窗口时 x/y 未生效，此处会再设一次）
+  // 恢复位置后再显示窗口，避免在默认位置闪现
   const savedPos = await invoke('load_ball_pos');
   if (savedPos) {
     const [x, y] = savedPos;
     await appWindow.setPosition(new PhysicalPosition(x, y));
   }
+  await appWindow.show();
   // 优先展示缓存数据，瞬时渲染，避免白屏
   const cached = await getCachedData();
   if (cached) d.value = cached;

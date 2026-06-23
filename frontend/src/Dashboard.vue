@@ -81,6 +81,7 @@ async function openBall() {
     width: 105, height: 55,
     decorations: false,
     alwaysOnTop: true, skipTaskbar: true,
+    visible: false,
     ...(pos ? { x: pos[0], y: pos[1] } : {}),
   });
   appWindow.hide();
