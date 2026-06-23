@@ -3,6 +3,7 @@ import { ref, onMounted } from "vue";
 import { getData, getCachedData, fmt, balance } from "./api.js";
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { PhysicalPosition } from '@tauri-apps/api/dpi';
 import { emit } from '@tauri-apps/api/event';
 
 const appWindow = getCurrentWindow();
@@ -50,6 +51,12 @@ async function onUp() {
 }
 
 onMounted(async () => {
+  // 恢复上次保存的位置（兜底：若创建窗口时 x/y 未生效，此处会再设一次）
+  const savedPos = await invoke('load_ball_pos');
+  if (savedPos) {
+    const [x, y] = savedPos;
+    await appWindow.setPosition(new PhysicalPosition(x, y));
+  }
   // 优先展示缓存数据，瞬时渲染，避免白屏
   const cached = await getCachedData();
   if (cached) d.value = cached;
